@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"godynamicserver/service"
+	"log"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -17,6 +19,7 @@ var (
 
 type DServer struct {
 	connectors map[int]*ServerConnector
+	g          errgroup.Group
 }
 
 func NewDServer() *DServer {
@@ -28,13 +31,18 @@ func NewDServer() *DServer {
 func (ds *DServer) Start() {
 	serviceRegistry := NewServiceRegistry(ds)
 	ds.addConnector(serviceRegistry)
+	if err := ds.g.Wait(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (ds *DServer) addConnector(service service.IService) {
 	connector := NewServerConnector(service)
 	if _, exist := ds.connectors[service.GetPort()]; !exist {
 		ds.connectors[service.GetPort()] = connector
-		connector.start()
+		ds.g.Go(func() error {
+			return connector.start()
+		})
 	}
 }
 
@@ -63,6 +71,7 @@ func handleAll(s service.IService) func(c *gin.Context) {
 		switch method {
 		case "GET":
 			s.DoGet(requestContext)
+			slog.Info("get", "response", requestContext.GetResponseBody())
 		case "POST":
 			bodyAsMap := map[string]any{}
 			err := c.ShouldBindJSON(&bodyAsMap)
@@ -80,6 +89,6 @@ func handleAll(s service.IService) func(c *gin.Context) {
 	}
 }
 
-func (sc *ServerConnector) start() {
-	sc.httpServer.ListenAndServe()
+func (sc *ServerConnector) start() error {
+	return sc.httpServer.ListenAndServe()
 }

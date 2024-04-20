@@ -9,12 +9,12 @@ import (
 
 type ServiceRegistry struct {
 	ds       *DServer
-	services []*model.Service
+	services []model.Service
 }
 
 func NewServiceRegistry(ds *DServer) *ServiceRegistry {
 	return &ServiceRegistry{
-		services: []*model.Service{},
+		services: []model.Service{},
 		ds:       ds,
 	}
 }
@@ -25,8 +25,9 @@ func (sr ServiceRegistry) GetPort() int {
 
 func (sr ServiceRegistry) DoGet(requestContext *service.RequestContext) {
 	slog.Info("registry  get", "path", requestContext.GetPath())
-	requestContext.SetResponseCode(201)
-	requestContext.SetResponseBody("Hello World")
+	requestContext.SetResponseCode(200)
+	requestContext.SetResponseBody(sr.services)
+	slog.Info("registry get", "services", sr.services)
 }
 
 func (sr *ServiceRegistry) DoPost(requestContext *service.RequestContext) {
@@ -68,7 +69,9 @@ func (sr *ServiceRegistry) DoPost(requestContext *service.RequestContext) {
 }
 
 func (sr *ServiceRegistry) registerService(service *model.Service) error {
-	slog.Info("service registry register service", "service", service)
+	slog.Info("registry register service", "service", service)
+	sr.services = append(sr.services, *service)
+	slog.Info("registry service registerred", "services", sr.services)
 	sr.ds.addConnector(service)
 	return nil
 }
