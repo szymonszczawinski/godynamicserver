@@ -82,10 +82,7 @@ func handleAll(s service.IService) func(c *gin.Context) {
 			requestContext.SetRequestBody(bodyAsMap)
 			s.DoPost(requestContext)
 		}
-		c.JSON(requestContext.GetResponseCode(), gin.H{
-			"code":    requestContext.GetResponseCode(),
-			"message": requestContext.GetResponseBody(),
-		})
+		c.JSON(requestContext.GetResponseCode(), requestContext.GetResponseBody())
 	}
 }
 

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"godynamicserver/service"
 	"log/slog"
 )
@@ -18,6 +19,16 @@ func NewService(id, name string, port int) *Service {
 		name: name,
 		port: port,
 	}
+}
+
+func (s Service) String() string {
+	jsonMap := map[string]any{"id": s.id, "name": s.name, "port": s.port}
+	jsonString, _ := json.Marshal(jsonMap)
+	return string(jsonString)
+}
+
+func (s Service) ToMap() map[string]any {
+	return map[string]any{"id": s.id, "name": s.name, "port": s.port}
 }
 
 func (s Service) GetPort() int {

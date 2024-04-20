@@ -26,7 +26,13 @@ func (sr ServiceRegistry) GetPort() int {
 func (sr ServiceRegistry) DoGet(requestContext *service.RequestContext) {
 	slog.Info("registry  get", "path", requestContext.GetPath())
 	requestContext.SetResponseCode(200)
-	requestContext.SetResponseBody(sr.services)
+	services := []map[string]any{}
+	for _, s := range sr.services {
+		services = append(services, s.ToMap())
+	}
+	responseBody := map[string]any{"code": 200, "services": services}
+
+	requestContext.SetResponseBody(responseBody)
 	slog.Info("registry get", "services", sr.services)
 }
 
@@ -35,36 +41,42 @@ func (sr *ServiceRegistry) DoPost(requestContext *service.RequestContext) {
 	bodyMap := requestContext.GetRequestBody()
 	id, ok := bodyMap["id"].(string)
 	if !ok {
+		responseBody := map[string]any{"code": 400, "error": fmt.Sprintf("id is not a string %v", bodyMap["id"])}
 		requestContext.SetResponseCode(400)
-		requestContext.SetResponseBody(fmt.Sprintf("id is not a string %v", bodyMap["id"]))
+		requestContext.SetResponseBody(responseBody)
 
 	}
 	name, ok := bodyMap["name"].(string)
 	if !ok {
+		responseBody := map[string]any{"code": 400, "error": fmt.Sprintf("name is not a string %v", bodyMap["name"])}
 		requestContext.SetResponseCode(400)
-		requestContext.SetResponseBody(fmt.Sprintf("name is not a string %v", bodyMap["name"]))
+		requestContext.SetResponseBody(responseBody)
 	}
 	if requestContext.GetPath() == "/" {
 		port, ok := bodyMap["port"].(float64)
 		if !ok {
+			responseBody := map[string]any{"code": 400, "error": fmt.Sprintf("port is not a number %v %T", bodyMap["port"], bodyMap["port"])}
 			requestContext.SetResponseCode(400)
-			requestContext.SetResponseBody(fmt.Sprintf("port is not a number %v %T", bodyMap["port"], bodyMap["port"]))
+			requestContext.SetResponseBody(responseBody)
 		}
 		service := model.NewService(id, name, int(port))
 		err := sr.registerService(service)
 		if err != nil {
+			responseBody := map[string]any{"code": 400, "error": err.Error()}
 			requestContext.SetResponseCode(400)
-			requestContext.SetResponseBody(err.Error())
+			requestContext.SetResponseBody(responseBody)
 		} else {
+			responseBody := map[string]any{"code": 201, "status": "OK"}
 
 			requestContext.SetResponseCode(201)
-			requestContext.SetResponseBody("OK")
+			requestContext.SetResponseBody(responseBody)
 		}
 
 	} else {
 		slog.Warn("registry post path not handled", "path", requestContext.GetPath())
+		responseBody := map[string]any{"code": 400, "error": "request path not handled"}
 		requestContext.SetResponseCode(400)
-		requestContext.SetResponseBody("request path not handled")
+		requestContext.SetResponseBody(responseBody)
 	}
 }
 

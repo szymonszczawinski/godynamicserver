@@ -1,7 +1,7 @@
 package service
 
 type RequestContext struct {
-	responseBody any
+	responseBody map[string]any
 	parameters   map[string]any
 	requestBody  map[string]any
 	path         string
@@ -31,7 +31,7 @@ func (rc *RequestContext) SetResponseCode(responseCode int) {
 	rc.responseCode = responseCode
 }
 
-func (rc *RequestContext) SetResponseBody(responseBody any) {
+func (rc *RequestContext) SetResponseBody(responseBody map[string]any) {
 	rc.responseBody = responseBody
 }
 
@@ -39,6 +39,6 @@ func (rc RequestContext) GetPath() string {
 	return rc.path
 }
 
-func (rc RequestContext) GetResponseBody() any {
+func (rc RequestContext) GetResponseBody() map[string]any {
 	return rc.responseBody
 }
