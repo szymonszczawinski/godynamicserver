@@ -16,24 +16,26 @@ var (
 )
 
 type DServer struct {
-	connectors []*ServerConnector
+	connectors map[int]*ServerConnector
 }
 
 func NewDServer() *DServer {
 	return &DServer{
-		connectors: []*ServerConnector{},
+		connectors: map[int]*ServerConnector{},
 	}
 }
 
 func (ds *DServer) Start() {
-	serviceRegistry := NewServiceRegistry()
+	serviceRegistry := NewServiceRegistry(ds)
 	ds.addConnector(serviceRegistry)
 }
 
 func (ds *DServer) addConnector(service service.IService) {
 	connector := NewServerConnector(service)
-	ds.connectors = append(ds.connectors, connector)
-	connector.start()
+	if _, exist := ds.connectors[service.GetPort()]; !exist {
+		ds.connectors[service.GetPort()] = connector
+		connector.start()
+	}
 }
 
 type ServerConnector struct {
@@ -69,10 +71,7 @@ func handleAll(s service.IService) func(c *gin.Context) {
 			}
 			slog.Info("parsed requst", "body", bodyAsMap)
 			requestContext.SetRequestBody(bodyAsMap)
-			err = s.DoPost(requestContext)
-			if errors.Is(err, Error400BadRequest) {
-				slog.Error("post error", "err", err)
-			}
+			s.DoPost(requestContext)
 		}
 		c.JSON(requestContext.GetResponseCode(), gin.H{
 			"code":    requestContext.GetResponseCode(),
