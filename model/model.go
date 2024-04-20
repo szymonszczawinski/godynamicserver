@@ -1,31 +1,31 @@
 package model
 
-type ServiceDefinition struct {
-	resources map[string]ResourceDefinition
+type Service struct {
+	resources map[string]Resource
 	id        string
 	name      string
-	uri       string
+	port      int
 }
 
-func NewServiceDefinition(id, name, uri string) ServiceDefinition {
-	return ServiceDefinition{
+func NewService(id, name string, port int) Service {
+	return Service{
 		id:   id,
 		name: name,
-		uri:  uri,
+		port: port,
 	}
 }
 
-func (sd *ServiceDefinition) AddResource(id, name string) {
-	sd.resources[name] = NewResourceDefiniton(id, name)
+func (sd *Service) AddResource(id, name string) {
+	sd.resources[name] = NewResource(id, name)
 }
 
-type ResourceDefinition struct {
+type Resource struct {
 	id   string
 	name string
 }
 
-func NewResourceDefiniton(id, name string) ResourceDefinition {
-	return ResourceDefinition{
+func NewResource(id, name string) Resource {
+	return Resource{
 		id:   id,
 		name: name,
 	}

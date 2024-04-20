@@ -1,12 +1,18 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"godynamicserver/service"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	Error404NotFound   = errors.New("not found")
+	Error400BadRequest = errors.New("bad request")
 )
 
 type DServer struct {
@@ -63,7 +69,10 @@ func handleAll(s service.IService) func(c *gin.Context) {
 			}
 			slog.Info("parsed requst", "body", bodyAsMap)
 			requestContext.SetRequestBody(bodyAsMap)
-			s.DoPost(requestContext)
+			err = s.DoPost(requestContext)
+			if errors.Is(err, Error400BadRequest) {
+				slog.Error("post error", "err", err)
+			}
 		}
 		c.JSON(requestContext.GetResponseCode(), gin.H{
 			"code":    requestContext.GetResponseCode(),
