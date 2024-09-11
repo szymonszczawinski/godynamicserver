@@ -2,29 +2,25 @@ package server
 
 import (
 	"errors"
-	"fmt"
-	"godynamicserver/service"
 	"log"
-	"log/slog"
-	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
 )
 
 var (
-	Error404NotFound   = errors.New("not found")
-	Error400BadRequest = errors.New("bad request")
+	Error404NotFound            = errors.New("not found")
+	Error400BadRequest          = errors.New("bad request")
+	ErrorUnsupportedMessageType = errors.New("unsupported message type")
 )
 
 type DServer struct {
-	connectors map[int]*ServerConnector
+	connectors map[int]*serverConnector
 	g          errgroup.Group
 }
 
 func NewDServer() *DServer {
 	return &DServer{
-		connectors: map[int]*ServerConnector{},
+		connectors: map[int]*serverConnector{},
 	}
 }
 
@@ -36,7 +32,7 @@ func (ds *DServer) Start() {
 	}
 }
 
-func (ds *DServer) addConnector(service service.IService) {
+func (ds *DServer) addConnector(service IService) {
 	connector := NewServerConnector(service)
 	if _, exist := ds.connectors[service.GetPort()]; !exist {
 		ds.connectors[service.GetPort()] = connector
@@ -44,48 +40,4 @@ func (ds *DServer) addConnector(service service.IService) {
 			return connector.start()
 		})
 	}
-}
-
-type ServerConnector struct {
-	router     *gin.Engine
-	httpServer *http.Server
-}
-
-func NewServerConnector(service service.IService) *ServerConnector {
-	router := gin.New()
-	router.NoRoute(handleAll(service))
-	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%v", service.GetPort()),
-		Handler: router,
-	}
-	return &ServerConnector{
-		httpServer: httpServer,
-		router:     router,
-	}
-}
-
-func handleAll(s service.IService) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		requestContext := service.NewRequestContext(c.Request.URL.Path, map[string]any{})
-		method := c.Request.Method
-		switch method {
-		case "GET":
-			s.DoGet(requestContext)
-			slog.Info("get", "response", requestContext.GetResponseBody())
-		case "POST":
-			bodyAsMap := map[string]any{}
-			err := c.ShouldBindJSON(&bodyAsMap)
-			if err != nil {
-				slog.Error("parse error", "err", err)
-			}
-			slog.Info("parsed requst", "body", bodyAsMap)
-			requestContext.SetRequestBody(bodyAsMap)
-			s.DoPost(requestContext)
-		}
-		c.JSON(requestContext.GetResponseCode(), requestContext.GetResponseBody())
-	}
-}
-
-func (sc *ServerConnector) start() error {
-	return sc.httpServer.ListenAndServe()
 }
