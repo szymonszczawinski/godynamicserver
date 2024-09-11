@@ -27,6 +27,11 @@ func isWebSocketRequest(r *http.Request) bool {
 	return connectionHeaderValue == "Upgrade"
 }
 
+type webSocketConnection struct {
+	conn      *websocket.Conn
+	connector *serverConnector
+}
+
 func connectWebSocket(w http.ResponseWriter, r *http.Request, s IService, sc *serverConnector) error {
 	slog.Info("new ws connection from", "address", r.RemoteAddr, "url", r.URL)
 	conn, err := connectionUpgrader.Upgrade(w, r, nil)
@@ -34,16 +39,29 @@ func connectWebSocket(w http.ResponseWriter, r *http.Request, s IService, sc *se
 		slog.Error("websocket upgrade connection error", "err", err)
 		return err
 	}
-	sc.wsconn = conn
-	go sc.readMessages(s)
-	go sc.writeMessages(s)
+	wsc := NewWebSocketConnection(conn, sc)
+	sc.wsconnections[&wsc] = true
+	go wsc.readMessages(s)
+	go wsc.writeMessages(s)
 	return nil
 }
 
-func (sc *serverConnector) writeMessages(s IService) {
+func NewWebSocketConnection(conn *websocket.Conn, connector *serverConnector) webSocketConnection {
+	return webSocketConnection{
+		conn:      conn,
+		connector: connector,
+	}
+}
+
+func (wsc *webSocketConnection) close() {
+	delete(wsc.connector.wsconnections, wsc)
+	wsc.conn.Close()
+}
+
+func (wsc *webSocketConnection) writeMessages(s IService) {
 	ticker := time.NewTicker(pingInterval)
 	defer func() {
-		sc.wsconn.Close()
+		wsc.close()
 		ticker.Stop()
 	}()
 
@@ -51,19 +69,19 @@ func (sc *serverConnector) writeMessages(s IService) {
 		select {
 		case message, ok := <-s.GetOutgoingMessagesQueue():
 			if !ok {
-				slog.Warn("write close message problem", "conn", sc.wsconn.RemoteAddr())
-				if err := sc.wsconn.WriteMessage(websocket.CloseMessage, nil); err != nil {
-					slog.Error("close message error", "conn", sc.wsconn.RemoteAddr(), "err", err)
+				slog.Warn("write close message problem", "conn", wsc.conn.RemoteAddr())
+				if err := wsc.conn.WriteMessage(websocket.CloseMessage, nil); err != nil {
+					slog.Error("close message error", "conn", wsc.conn.RemoteAddr(), "err", err)
 					return
 				}
 			}
 			slog.Debug("sending message", "msg", message)
-			if err := sc.wsconn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+			if err := wsc.conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
 				slog.Error("error sending message", "msg", message, "err", err)
 			}
 		case <-ticker.C:
 			slog.Debug("sending PING")
-			if err := sc.wsconn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+			if err := wsc.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				slog.Error("sending PING error", "err", err)
 				return
 			}
@@ -71,18 +89,18 @@ func (sc *serverConnector) writeMessages(s IService) {
 	}
 }
 
-func (sc *serverConnector) readMessages(s IService) {
+func (wsc *webSocketConnection) readMessages(s IService) {
 	defer func() {
-		sc.wsconn.Close()
+		wsc.close()
 	}()
 
-	if err := configureWebSocketConnection(sc.wsconn); err != nil {
+	if err := configureWebSocketConnection(wsc.conn); err != nil {
 		slog.Error("configuring ws connection error", "err", err)
 		return
 	}
 
 	for {
-		messageType, payload, err := sc.wsconn.ReadMessage()
+		messageType, payload, err := wsc.conn.ReadMessage()
 		if err != nil {
 			slog.Error("reading message error", "err", err)
 			break

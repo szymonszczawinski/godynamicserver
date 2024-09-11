@@ -17,10 +17,10 @@ type IService interface {
 }
 type service struct {
 	resources map[string]Resource
+	outgoing  chan string
 	id        string
 	name      string
 	port      int
-	outgoing  chan string
 }
 
 func NewService(id, name string, port int) *service {
@@ -78,13 +78,15 @@ func (s *service) AddResource(id, name string) {
 }
 
 type Resource struct {
-	id   string
-	name string
+	elements map[string]any
+	id       string
+	name     string
 }
 
 func NewResource(id, name string) Resource {
 	return Resource{
-		id:   id,
-		name: name,
+		id:       id,
+		name:     name,
+		elements: map[string]any{},
 	}
 }

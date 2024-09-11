@@ -8,17 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/gorilla/websocket"
 )
-
-type ErrorResponse struct {
-	Message string `json:"message"`
-	Code    int    `json:"code"`
-}
-type DataResponse struct {
-	Data map[string]any `json:"data"`
-	Code int            `json:"code"`
-}
 
 func sendJSONError(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")
@@ -38,14 +28,15 @@ func handle(hf handlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := hf(w, r); err != nil {
 			slog.Error("http request error", "request", r.URL, "err", err)
+			sendJSONError(w, 400, err.Error())
 		}
 	}
 }
 
 type serverConnector struct {
-	router     http.Handler
-	httpServer *http.Server
-	wsconn     *websocket.Conn
+	router        http.Handler
+	httpServer    *http.Server
+	wsconnections map[*webSocketConnection]bool
 }
 
 func NewServerConnector(service IService) *serverConnector {
@@ -56,8 +47,9 @@ func NewServerConnector(service IService) *serverConnector {
 		Handler: router,
 	}
 	connector := &serverConnector{
-		httpServer: httpServer,
-		router:     router,
+		httpServer:    httpServer,
+		router:        router,
+		wsconnections: map[*webSocketConnection]bool{},
 	}
 	router.Handle("/*", handle(handleAll(service, connector)))
 	return connector
